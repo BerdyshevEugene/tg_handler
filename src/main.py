@@ -40,11 +40,11 @@ bot = Bot(token=bot_token)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     commands_list = [
-        '/start - Начать взаимодействие с ботом',
-        '/addreminder YYYY-MM-DD HH:MM ваше_сообщение - Добавить напоминание',
-        '/listreminders - Показать список текущих напоминаний',
-        '/deletereminder номер - Удалить напоминание по номеру',
-        '/sendlocation - Отправьте ваше местоположение, чтобы получать прогноз погоды'
+        '/start - начать взаимодействие с ботом',
+        '/addreminder YYYY-MM-DD HH:MM <ваше_сообщение> - добавить напоминание',
+        '/listreminders - показать список текущих напоминаний',
+        '/deletereminder <номер> - удалить напоминание по номеру',
+        '/sendlocation - отправьте ваше местоположение, чтобы получать прогноз погоды'
     ]
     await update.message.reply_text('Привет! Список команд:\n' + '\n'.join(commands_list))
 
@@ -114,8 +114,8 @@ async def handle_list_reminders(update: Update, context: ContextTypes.DEFAULT_TY
 
 async def handle_delete_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        reminder_id = int(context.args[0])
-        if delete_reminder(reminder_id):
+        reminder_index = int(context.args[0]) - 1
+        if delete_reminder(reminder_index):
             await update.message.reply_text('напоминание удалено')
         else:
             await update.message.reply_text('напоминания с таким номером не найдено')
@@ -127,6 +127,7 @@ if __name__ == '__main__':
     application = Application.builder().token(bot_token).build()
 
     application.add_handler(CommandHandler('start', start))
+    application.add_handler(CommandHandler('sendlocation', sendlocation))
     application.add_handler(MessageHandler(filters.LOCATION, location))
     application.add_handler(CommandHandler('listcommands', list_user_commands))
     application.add_handler(CommandHandler('addreminder', handle_add_reminder))
@@ -137,7 +138,7 @@ if __name__ == '__main__':
 
     # cоздаем планировщик и добавляем задачу
     scheduler = AsyncIOScheduler()
-    scheduler.add_job(send_weather, 'interval', hours=3)
+    scheduler.add_job(send_weather, 'interval', hours=1)
     scheduler.start()
 
     # запуск бота

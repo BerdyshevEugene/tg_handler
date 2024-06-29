@@ -43,7 +43,11 @@ def list_reminders():
     return reminders
 
 
-def delete_reminder(reminder_id):
+def delete_reminder(index):
+    reminders = list_reminders()
+    if index < 0 or index >= len(reminders):
+        return False
+    reminder_id = reminders[index][0]
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
     c.execute('DELETE FROM reminders WHERE id = ?', (reminder_id,))
