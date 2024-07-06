@@ -9,7 +9,8 @@ def initialize_database():
     c.execute('''CREATE TABLE IF NOT EXISTS locations
                  (user_id INTEGER PRIMARY KEY,
                  latitude REAL,
-                 longitude REAL)''')
+                 longitude REAL,
+                 chat_id INTEGER)''')
     conn.commit()
     conn.close()
 
@@ -17,11 +18,11 @@ def initialize_database():
 initialize_database()
 
 
-def add_location(user_id, latitude, longitude):
+def add_location(user_id, latitude, longitude, chat_id):
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    c.execute('REPLACE INTO locations(user_id, latitude, longitude) VALUES (?, ?, ?)',
-              (user_id, latitude, longitude))
+    c.execute('REPLACE INTO locations (user_id, latitude, longitude, chat_id) VALUES (?, ?, ?, ?)',
+              (user_id, latitude, longitude, chat_id))
     conn.commit()
     conn.close()
 
@@ -30,7 +31,7 @@ def get_location(user_id):
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
     c.execute(
-        'SELECT latitude, longitude FROM locations WHERE user_id = ?', (user_id,))
+        'SELECT latitude, longitude, chat_id FROM locations WHERE user_id = ?', (user_id,))
     location = c.fetchone()
     conn.close()
     return location
@@ -39,7 +40,7 @@ def get_location(user_id):
 def get_all_locations():
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    c.execute('SELECT user_id, latitude, longitude FROM locations')
+    c.execute('SELECT user_id, latitude, longitude, chat_id FROM locations')
     locations = c.fetchall()
     conn.close()
     return locations

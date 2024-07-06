@@ -1,6 +1,8 @@
 import sqlite3
 import datetime
 
+from loguru import logger
+
 DATABASE = 'reminders.db'
 
 
@@ -9,6 +11,7 @@ def initialize_database():
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS reminders
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 user_id INTEGER,
                  reminder_time TIMESTAMP,
                  message TEXT)''')
     conn.commit()
@@ -18,32 +21,35 @@ def initialize_database():
 initialize_database()
 
 
-def add_reminder(time_str, message):
+def add_reminder(user_id, time_str, message):
     try:
         reminder_time = datetime.datetime.strptime(time_str, '%Y-%m-%d %H:%M')
-    except ValueError:
-        raise ValueError(
-            'неправильный формат времени. Используйте формат: YYYY-MM-DD HH:MM')
+    except ValueError as e:
+        error_message = 'неправильный формат времени. Используйте формат: YYYY-MM-DD HH:MM'
+        logger.error(
+            f'Failed to add reminder for user {user_id}: {error_message}. Error: {str(e)}')
+        raise ValueError(error_message)
 
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    c.execute('INSERT INTO reminders (reminder_time, message) VALUES (?, ?)',
-              (reminder_time, message))
+    c.execute('INSERT INTO reminders (user_id, reminder_time, message) VALUES (?, ?, ?)',
+              (user_id, reminder_time, message))
     conn.commit()
     conn.close()
 
 
-def list_reminders():
+def list_reminders(user_id):
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    c.execute('SELECT * FROM reminders ORDER BY reminder_time')
+    c.execute(
+        'SELECT * FROM reminders WHERE user_id=? ORDER BY reminder_time', (user_id,))
     reminders = c.fetchall()
     conn.close()
     return reminders
 
 
-def delete_reminder_by_index(index):
-    reminders = list_reminders()
+def delete_reminder_by_index(user_id, index):
+    reminders = list_reminders(user_id)
     if index < 0 or index >= len(reminders):
         return False
     reminder_id = reminders[index][0]

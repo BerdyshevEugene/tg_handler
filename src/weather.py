@@ -27,8 +27,10 @@ def get_weather_text(city: str):
 
 async def send_weather(bot, chat_id):
     locations = get_all_locations()
-    for user_id, latitude, longitude in locations:
+    for user_id, latitude, longitude, user_chat_id in locations:
         observation = mgr.weather_at_coords(latitude, longitude)
         city = observation.location.name
-        weather_text = get_weather_text(city)
-        await bot.send_message(chat_id=chat_id, text=f'Пользователь {user_id}: {weather_text}')
+        weather_text = f'Погода в городе {city}: {observation.weather.detailed_status}\nТемпература: {observation.weather.temperature("celsius")["temp"]}°C'
+        if 'rain' in observation.weather.status.lower():
+            weather_text += '\nВозьмите зонт, возможен дождь!'
+        await bot.send_message(chat_id=user_chat_id, text=f'Пользователь {user_id}: {weather_text}')

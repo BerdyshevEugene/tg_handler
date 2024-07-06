@@ -1,21 +1,24 @@
 import os
 from dotenv import load_dotenv
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from loguru import logger
 from telegram import Bot, Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, filters,
     ContextTypes, CallbackQueryHandler, ConversationHandler
 )
 
+from logger.logger import setup_logger
+from location_storage import add_location
 from weather import send_weather
 from reminder import add_reminder, list_reminders, delete_reminder_by_index, daily_summary
-from location_storage import add_location
+from service.service_messages import send_service_message
+
 
 load_dotenv()
 TG_BOT_TOKEN = os.getenv('TG_BOT_TOKEN')
-chat_id = os.getenv('GROUP_ID')
+CHAT_ID = os.getenv('GROUP_ID')
 bot = Bot(token=TG_BOT_TOKEN)
-
 ADD_REMINDER, DELETE_REMINDER = range(2)
 
 
@@ -40,6 +43,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+async def handle_service_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message = 'Привет! Я ботик и только учусь, возможны сбои в работе в ближайшие выходные, но это ничего. Инфо по всем обновлениям будет приходить сюда. Спасибо!'
+    await send_service_message(message)
+    await update.message.reply_text('Служебные сообщения отправлены всем пользователям.')
+
+
 async def sendlocation(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.callback_query.message.reply_text('пожалуйста, отправьте мне ваше местоположение, чтобы я мог отправлять вам прогноз погоды.')
 
@@ -47,7 +56,9 @@ async def sendlocation(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     user_location = update.message.location
-    add_location(user_id, user_location.latitude, user_location.longitude)
+    chat_id = update.message.chat_id
+    add_location(user_id, user_location.latitude,
+                 user_location.longitude, chat_id)
     await update.message.reply_text('местоположение сохранено! Теперь я буду отправлять вам прогноз погоды')
 
 
@@ -57,30 +68,54 @@ async def handle_add_reminder_start(update: Update, context: ContextTypes.DEFAUL
 
 
 async def handle_add_reminder_finish(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text
+    if update.callback_query:
+        user_id = update.callback_query.from_user.id
+    else:
+        user_id = update.message.from_user.id
+
+    text = update.effective_message.text
     text_parts = text.split(' ', 2)
+
     if len(text_parts) < 3:
-        await update.message.reply_text('неправильный формат. Используйте: YYYY-MM-DD HH:MM ваше сообщение')
+        await update.message.reply_text('неправильный формат. Введите напоминание еще раз, чтобы я его сохранио. Используйте: YYYY-MM-DD HH:MM ваше сообщение')
         return ADD_REMINDER
 
     time_str = f'{text_parts[0]} {text_parts[1]}'
     message = text_parts[2]
-    add_reminder(time_str, message)
-    await update.message.reply_text('напоминание добавлено')
-    return ConversationHandler.END
+
+    try:
+        add_reminder(user_id, time_str, message)
+        await update.message.reply_text('напоминание добавлено')
+        return ConversationHandler.END
+    except ValueError as e:
+        await update.message.reply_text(str(e))
+        return ADD_REMINDER
 
 
 async def handle_list_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    reminders = list_reminders()
-    reminder_texts = [
-        f'{i + 1}. {reminder[1]}: {reminder[2]}' for i, reminder in enumerate(reminders)]
+    query = update.callback_query
+    user_id = query.from_user.id
+    reminders = list_reminders(user_id)
+
+    reminder_texts = []
+    current_date = None
+
+    for i, reminder in enumerate(reminders):
+        reminder_datetime = reminder[1]
+        reminder_time = reminder_datetime.split()[1][:5]
+        reminder_message = f'{reminder_datetime.split()[0]} {reminder_time}: {reminder[2]}'
+
+        reminder_date = reminder_datetime.split()[0]
+
+        if reminder_date != current_date:
+            if i != 0:
+                reminder_texts.append('')
+            current_date = reminder_date
+
+        reminder_texts.append(f'{i + 1}. {reminder_message}')
     response_text = '\n'.join(
         reminder_texts) if reminder_texts else 'напоминаний нет'
-
-    if update.message:
-        await update.message.reply_text(response_text)
-    elif update.callback_query:
-        await update.callback_query.message.edit_text(response_text)
+    await query.message.edit_text(response_text)
 
 
 async def handle_delete_reminder_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -89,16 +124,35 @@ async def handle_delete_reminder_start(update: Update, context: ContextTypes.DEF
 
 
 async def handle_delete_reminder_finish(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text
     try:
+        if update.callback_query:
+            user_id = update.callback_query.from_user.id
+            text = update.effective_message.text
+        elif update.message:
+            user_id = update.message.from_user.id
+            text = update.message.text
+        else:
+            logger.error(
+                'Не удалось определить пользователя для удаления напоминания.')
+            await update.message.reply_text('Произошла ошибка. Попробуйте еще раз или обратитесь к администратору.')
+            return ConversationHandler.END
+
         reminder_index = int(text) - 1
-        if delete_reminder_by_index(reminder_index):
+
+        if delete_reminder_by_index(user_id, reminder_index):
             await update.message.reply_text('напоминание удалено')
         else:
             await update.message.reply_text('напоминания с таким номером не найдено')
+
+    except AttributeError as e:
+        logger.error(f'ошибка при удалении напоминания: {e}')
+        await update.message.reply_text('произошла ошибка при удалении напоминания')
     except ValueError:
         await update.message.reply_text('неправильный формат. Введите номер напоминания')
         return DELETE_REMINDER
+    except Exception as e:
+        logger.error(f'произошла ошибка: {e}')
+        await update.message.reply_text('произошла ошибка. Попробуйте еще раз или обратитесь к администратору')
 
     return ConversationHandler.END
 
@@ -120,6 +174,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 if __name__ == '__main__':
+    setup_logger()
     application = Application.builder().token(TG_BOT_TOKEN).build()
 
     conv_handler = ConversationHandler(
@@ -132,17 +187,19 @@ if __name__ == '__main__':
     )
 
     application.add_handler(CommandHandler('start', start))
+    application.add_handler(CommandHandler('service', handle_service_message))
     application.add_handler(MessageHandler(filters.LOCATION, location))
     application.add_handler(conv_handler)
 
     scheduler = AsyncIOScheduler()
-    scheduler.add_job(send_weather, 'cron', hour=8, args=[bot, chat_id])
-    scheduler.add_job(send_weather, 'cron', hour=12, args=[bot, chat_id])
+    scheduler.add_job(send_weather, 'cron', hour=8, args=[bot, CHAT_ID])
+    scheduler.add_job(send_weather, 'cron', hour=12, args=[bot, CHAT_ID])
     scheduler.add_job(send_weather, 'cron', hour=17,
-                      minute=40, args=[bot, chat_id])
-    scheduler.add_job(send_weather, 'cron', hour=21, args=[bot, chat_id])
-    scheduler.add_job(daily_summary, 'cron', hour=10,
-                      minute=00, args=[bot, chat_id])
+                      minute=40, args=[bot, CHAT_ID])
+    scheduler.add_job(send_weather, 'cron', hour=20,
+                      minute=00, args=[bot, CHAT_ID])
+    scheduler.add_job(daily_summary, 'cron', hour=9,
+                      minute=00, args=[bot, CHAT_ID])
     scheduler.start()
 
     application.run_polling()
