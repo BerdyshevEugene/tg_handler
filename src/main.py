@@ -46,11 +46,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_service_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = 'Привет! Я ботик и только учусь, возможны сбои в работе в ближайшие выходные, но это ничего. Инфо по всем обновлениям будет приходить сюда. Спасибо!'
     await send_service_message(message)
-    await update.message.reply_text('Служебные сообщения отправлены всем пользователям.')
+    await update.message.reply_text('служебные сообщения отправлены всем пользователям')
 
 
 async def sendlocation(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.callback_query.message.reply_text('пожалуйста, отправьте мне ваше местоположение, чтобы я мог отправлять вам прогноз погоды.')
+    await update.callback_query.message.reply_text('пожалуйста, отправьте мне ваше местоположение, чтобы я мог отправлять вам прогноз погоды')
 
 
 async def location(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -59,11 +59,11 @@ async def location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.message.chat_id
     add_location(user_id, user_location.latitude,
                  user_location.longitude, chat_id)
-    await update.message.reply_text('местоположение сохранено! Теперь я буду отправлять вам прогноз погоды')
+    await update.message.reply_text('местоположение сохранено! Теперь я буду отправлять вам прогноз погоды по данной локации')
 
 
 async def handle_add_reminder_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.callback_query.message.reply_text('Введите напоминание в формате: YYYY-MM-DD HH:MM ваше сообщение')
+    await update.callback_query.message.reply_text('введите напоминание в формате: YYYY-MM-DD HH:MM ваше сообщение')
     return ADD_REMINDER
 
 
@@ -77,7 +77,7 @@ async def handle_add_reminder_finish(update: Update, context: ContextTypes.DEFAU
     text_parts = text.split(' ', 2)
 
     if len(text_parts) < 3:
-        await update.message.reply_text('неправильный формат. Введите напоминание еще раз, чтобы я его сохранио. Используйте: YYYY-MM-DD HH:MM ваше сообщение')
+        await update.message.reply_text('неправильный формат. Введите повторно, используйте: YYYY-MM-DD HH:MM ваше сообщение')
         return ADD_REMINDER
 
     time_str = f'{text_parts[0]} {text_parts[1]}'
@@ -195,11 +195,11 @@ if __name__ == '__main__':
     scheduler.add_job(send_weather, 'cron', hour=8, args=[bot, CHAT_ID])
     scheduler.add_job(send_weather, 'cron', hour=12, args=[bot, CHAT_ID])
     scheduler.add_job(send_weather, 'cron', hour=17,
-                      minute=40, args=[bot, CHAT_ID])
+                      minute=51, args=[bot, CHAT_ID])
     scheduler.add_job(send_weather, 'cron', hour=20,
-                      minute=00, args=[bot, CHAT_ID])
-    scheduler.add_job(daily_summary, 'cron', hour=9,
-                      minute=00, args=[bot, CHAT_ID])
+                      minute=0, args=[bot, CHAT_ID])
+    scheduler.add_job(daily_summary, 'cron', hour=11,
+                      minute=45, args=[bot, CHAT_ID])
     scheduler.start()
 
     application.run_polling()

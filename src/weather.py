@@ -4,33 +4,51 @@ from telegram import Bot
 from pyowm import OWM
 from pyowm.utils.config import get_default_config
 from location_storage import get_all_locations
-
+from loguru import logger
 
 load_dotenv()
 
 owm_api_key = os.getenv('OWM_API')
-owm_config = get_default_config()
-owm_config['language'] = 'ru'
-owm = OWM(owm_api_key, owm_config)
+owm = OWM(owm_api_key)
 mgr = owm.weather_manager()
-chat_id = os.getenv('GROUP_ID')
+config_dict = get_default_config()
+config_dict['language'] = 'ru'
+
+weather_icons = {
+    'Clear': '☀️',
+    'Clouds': '☁️',
+    'Rain': '🌧',
+    'Drizzle': '🌦',
+    'Thunderstorm': '⛈',
+    'Snow': '❄️',
+    'Mist': '🌫',
+    'Fog': '🌫',
+    'Haze': '🌫',
+    'Smoke': '🌫'
+}
 
 
-def get_weather_text(city: str):
-    observation = mgr.weather_at_place(city)
-    w = observation.weather
-    weather_text = f'Погода в городе {city}: {w.detailed_status}\nТемпература: {w.temperature("celsius")["temp"]}°C'
-    if 'rain' in w.status.lower():
-        weather_text += '\nВозьмите зонт, возможен дождь!'
-    return weather_text
+def get_weather_icon(status):
+    return weather_icons.get(status, '')
 
 
-async def send_weather(bot, chat_id):
+def get_weather_forecast(lat, lon):
+    observation = mgr.weather_at_coords(lat, lon)
+    weather = observation.weather
+    status = weather.detailed_status
+    temperature = weather.temperature('celsius')['temp']
+    icon = get_weather_icon(weather.status)
+    return f'{icon} {status.capitalize()}, температура: {temperature}°C'
+
+
+async def send_weather(bot: Bot, chat_id: int):
     locations = get_all_locations()
-    for user_id, latitude, longitude, user_chat_id in locations:
-        observation = mgr.weather_at_coords(latitude, longitude)
-        city = observation.location.name
-        weather_text = f'Погода в городе {city}: {observation.weather.detailed_status}\nТемпература: {observation.weather.temperature("celsius")["temp"]}°C'
-        if 'rain' in observation.weather.status.lower():
-            weather_text += '\nВозьмите зонт, возможен дождь!'
-        await bot.send_message(chat_id=user_chat_id, text=f'Пользователь {user_id}: {weather_text}')
+    for user_id, latitude, longitude, chat_id, timezone_str in locations:
+        try:
+            weather_forecast = get_weather_forecast(latitude, longitude)
+            message = f'прогноз погоды:\n{weather_forecast}'
+            await bot.send_message(chat_id=chat_id, text=message)
+            logger.info(f'отправлен прогноз погоды пользователю {user_id}')
+        except Exception as e:
+            logger.error(
+                f'не удалось отправить сообщение пользователю {user_id}: {e}')
