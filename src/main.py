@@ -11,7 +11,7 @@ from telegram.ext import (
 from logger.logger import setup_logger
 from location_storage import add_location
 from weather import send_weather
-from reminder import add_reminder, list_reminders, delete_reminder_by_index, daily_summary
+from reminder import add_reminder, list_reminders, delete_reminder_by_index, daily_summary, parse_indices
 from service.service_messages import send_service_message
 
 
@@ -28,7 +28,7 @@ def get_main_keyboard():
                               callback_data='addreminder')],
         [InlineKeyboardButton('список напоминаний',
                               callback_data='listreminders')],
-        [InlineKeyboardButton('удалить напоминание',
+        [InlineKeyboardButton('удалить напоминание(-я)',
                               callback_data='deletereminder')],
         [InlineKeyboardButton('отправить местоположение',
                               callback_data='sendlocation')]
@@ -44,7 +44,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_service_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    message = 'Привет! Я ботик и только учусь, возможны сбои в работе в ближайшие выходные, но это ничего. Инфо по всем обновлениям будет приходить сюда. Спасибо!'
+    message = 'возможны ошибки'
     await send_service_message(message)
     await update.message.reply_text('служебные сообщения отправлены всем пользователям')
 
@@ -63,7 +63,7 @@ async def location(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_add_reminder_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.callback_query.message.reply_text('введите напоминание в формате: YYYY-MM-DD HH:MM ваше сообщение')
+    await update.callback_query.message.reply_text('введите напоминание в одном из следующих форматов: \n- YYYY-MM-DD HH:MM ваше сообщение \n- 18 августа посмотреть фильм \n- послезавтра в 18:00 не забыть позвонить кому нибудь')
     return ADD_REMINDER
 
 
@@ -133,23 +133,26 @@ async def handle_delete_reminder_finish(update: Update, context: ContextTypes.DE
             text = update.message.text
         else:
             logger.error(
-                'Не удалось определить пользователя для удаления напоминания.')
-            await update.message.reply_text('Произошла ошибка. Попробуйте еще раз или обратитесь к администратору.')
+                'не удалось определить пользователя для удаления напоминания.')
+            await update.message.reply_text('произошла ошибка. Попробуйте еще раз или обратитесь к администратору')
             return ConversationHandler.END
 
-        reminder_index = int(text) - 1
+        indices = parse_indices(text.strip())
 
-        if delete_reminder_by_index(user_id, reminder_index):
-            await update.message.reply_text('напоминание удалено')
+        if indices:
+            successful_deletions, failed_deletions = delete_reminder_by_index(
+                user_id, indices)
+
+            if successful_deletions:
+                await update.message.reply_text(f'удалено напоминание(-я) под номерами: {", ".join(str(idx + 1) for idx in successful_deletions)}')
+            else:
+                await update.message.reply_text('напоминания с указанными номерами не найдены')
         else:
-            await update.message.reply_text('напоминания с таким номером не найдено')
+            await update.message.reply_text('введите номер(а) напоминания для удаления')
 
-    except AttributeError as e:
-        logger.error(f'ошибка при удалении напоминания: {e}')
-        await update.message.reply_text('произошла ошибка при удалении напоминания')
     except ValueError:
-        await update.message.reply_text('неправильный формат. Введите номер напоминания')
-        return DELETE_REMINDER
+        await update.message.reply_text('неправильный формат. Введите номер(а) напоминания для удаления')
+        return ConversationHandler.END
     except Exception as e:
         logger.error(f'произошла ошибка: {e}')
         await update.message.reply_text('произошла ошибка. Попробуйте еще раз или обратитесь к администратору')
@@ -198,8 +201,8 @@ if __name__ == '__main__':
                       minute=51, args=[bot, CHAT_ID])
     scheduler.add_job(send_weather, 'cron', hour=20,
                       minute=0, args=[bot, CHAT_ID])
-    scheduler.add_job(daily_summary, 'cron', hour=11,
-                      minute=45, args=[bot, CHAT_ID])
+    scheduler.add_job(daily_summary, 'cron', hour=17,
+                      minute=52, args=[bot, CHAT_ID])
     scheduler.start()
 
     application.run_polling()

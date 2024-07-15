@@ -1,6 +1,5 @@
 import datetime
-
-
+import dateparser
 from loguru import logger
 from service.db_connector import get_reminder_db_connection, initialize_reminder_db
 
@@ -19,9 +18,15 @@ def get_all_user_ids():
 
 def add_reminder(user_id, time_str, message):
     try:
-        reminder_time = datetime.datetime.strptime(time_str, '%Y-%m-%d %H:%M')
-    except ValueError as e:
-        error_message = 'неправильный формат времени. Используйте формат: YYYY-MM-DD HH:MM'
+        parsed_time = dateparser.parse(
+            time_str, settings={'PREFER_DATES_FROM': 'future'})
+        if not parsed_time:
+            raise ValueError('не удалось распознать дату или время')
+        if parsed_time.time() == datetime.time(0, 0):
+            parsed_time = parsed_time.replace(hour=0, minute=0)
+        reminder_time = parsed_time.replace(second=0, microsecond=0)
+    except Exception as e:
+        error_message = 'неправильный формат времени. Используйте что-то вроде: "завтра в 15:00" или "2023-12-31 15:00"'
         logger.error(
             f'failed to add reminder for user {user_id}: {error_message}. Error: {str(e)}')
         raise ValueError(error_message)
@@ -47,21 +52,45 @@ def list_reminders(user_id):
     return reminders
 
 
-def delete_reminder_by_index(user_id, index):
+def delete_reminder_by_index(user_id, indices):
     reminders = list_reminders(user_id)
-    if index < 0 or index >= len(reminders):
-        logger.warning(
-            f'attempted to delete non-existent reminder at index {index} for user {user_id}')
-        return False
-    reminder_id = reminders[index][0]
+    successful_deletions = []
+    failed_deletions = []
     conn = get_reminder_db_connection()
     c = conn.cursor()
-    c.execute('DELETE FROM reminders WHERE id = ?', (reminder_id,))
+
+    for index in indices:
+        if index < 0 or index >= len(reminders):
+            logger.warning(
+                f'attempted to delete non-existent reminder at index {index} for user {user_id}')
+            failed_deletions.append(index)
+        else:
+            reminder_id = reminders[index][0]
+            c.execute('DELETE FROM reminders WHERE id = ?', (reminder_id,))
+            successful_deletions.append(index)
     conn.commit()
     conn.close()
-    logger.info(
-        f'deleted reminder {reminder_id} at index {index} for user {user_id}')
-    return c.rowcount > 0
+
+    if successful_deletions:
+        logger.info(
+            f'deleted reminders at indices {successful_deletions} for user {user_id}')
+    if failed_deletions:
+        logger.warning(
+            f'failed to delete reminders at indices {failed_deletions} for user {user_id}')
+    return successful_deletions, failed_deletions
+
+
+def parse_indices(indices_str):
+    indices = []
+    for part in indices_str.split():
+        if ',' in part:
+            indices.extend(
+                [int(x) - 1 for x in part.split(',') if x.isdigit()])
+        elif part.isdigit():
+            indices.append(int(part) - 1)
+        else:
+            logger.warning(f'wrong index format: {part}')
+    return indices
 
 
 async def daily_summary(bot, chat_id):
