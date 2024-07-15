@@ -18,8 +18,9 @@ from service.service_messages import send_service_message
 load_dotenv()
 TG_BOT_TOKEN = os.getenv('TG_BOT_TOKEN')
 CHAT_ID = os.getenv('GROUP_ID')
-bot = Bot(token=TG_BOT_TOKEN)
 ADD_REMINDER, DELETE_REMINDER = range(2)
+
+bot = Bot(token=TG_BOT_TOKEN)
 
 
 def get_main_keyboard():

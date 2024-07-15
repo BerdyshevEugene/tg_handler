@@ -5,7 +5,7 @@ tf = TimezoneFinder()
 initialize_location_db()
 
 
-def add_location(user_id, latitude, longitude, chat_id):
+def add_location(user_id, latitude, longitude, chat_id, timezone):
     timezone = tf.timezone_at(lat=latitude, lng=longitude)
     conn = get_location_db_connection()
     c = conn.cursor()
@@ -13,16 +13,6 @@ def add_location(user_id, latitude, longitude, chat_id):
               (user_id, latitude, longitude, chat_id, timezone))
     conn.commit()
     conn.close()
-
-
-def get_location(user_id):
-    conn = get_location_db_connection()
-    c = conn.cursor()
-    c.execute(
-        'SELECT latitude, longitude, chat_id, timezone FROM locations WHERE user_id = ?', (user_id,))
-    location = c.fetchone()
-    conn.close()
-    return location
 
 
 def get_all_locations():
@@ -33,3 +23,13 @@ def get_all_locations():
     locations = c.fetchall()
     conn.close()
     return locations
+
+
+def get_location(user_id):
+    conn = get_location_db_connection()
+    c = conn.cursor()
+    c.execute(
+        'SELECT latitude, longitude, chat_id, timezone FROM locations WHERE user_id = ?', (user_id,))
+    location = c.fetchone()
+    conn.close()
+    return location
