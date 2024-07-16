@@ -38,7 +38,7 @@ def add_reminder(user_id, time_str, message):
     conn.commit()
     conn.close()
     logger.info(
-        f'Reminder added for user {user_id} at {reminder_time} with message: {message}')
+        f'reminder added for user {user_id} at {reminder_time} with message: {message}')
 
 
 def list_reminders(user_id):

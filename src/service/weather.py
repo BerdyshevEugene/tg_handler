@@ -1,10 +1,12 @@
 import os
+
 from dotenv import load_dotenv
+from loguru import logger
 from telegram import Bot
 from pyowm import OWM
 from pyowm.utils.config import get_default_config
+
 from location_storage import get_all_locations
-from loguru import logger
 
 load_dotenv()
 
@@ -46,9 +48,10 @@ async def send_weather(bot: Bot, chat_id: int):
     for user_id, latitude, longitude, chat_id, timezone_str in locations:
         try:
             weather_forecast = get_weather_forecast(latitude, longitude)
-            message = f'прогноз погоды:\n{weather_forecast}'
+            message = f'погода сейчас:\n{weather_forecast}'
             await bot.send_message(chat_id=chat_id, text=message)
-            logger.info(f'отправлен прогноз погоды пользователю {user_id}')
+            logger.info(
+                f'the weather report has been sent to the user {user_id}')
         except Exception as e:
             logger.error(
-                f'не удалось отправить сообщение пользователю {user_id}: {e}')
+                f'failed to send a message to the user {user_id}: {e}')
