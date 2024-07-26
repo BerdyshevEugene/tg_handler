@@ -33,7 +33,9 @@ def initialize_location_db():
                  latitude REAL,
                  longitude REAL,
                  chat_id INTEGER,
-                 timezone TEXT)''')
+                 timezone TEXT,
+                 hour INTEGER,
+                 minute INTEGER)''')
     conn.commit()
     c.execute('PRAGMA table_info(locations)')
     columns = [column[1] for column in c.fetchall()]
@@ -45,6 +47,10 @@ def initialize_location_db():
         c.execute('ALTER TABLE locations ADD COLUMN chat_id INTEGER')
     if 'timezone' not in columns:
         c.execute('ALTER TABLE locations ADD COLUMN timezone TEXT')
+    if 'hour' not in columns:
+        c.execute('ALTER TABLE locations ADD COLUMN hour INTEGER')
+    if 'minute' not in columns:
+        c.execute('ALTER TABLE locations ADD COLUMN minute INTEGER')
     conn.commit()
     conn.close()
 

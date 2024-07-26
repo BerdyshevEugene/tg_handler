@@ -32,7 +32,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_service_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    message = 'возможны ошибки'
+    message = 'ведется работа над отправкой утренних напоминаний по часовому поясу пользователя'
     await send_service_message(message)
     await update.message.reply_text('служебные сообщения отправлены всем пользователям')
 
