@@ -93,10 +93,14 @@ def parse_indices(indices_str):
     return indices
 
 
-async def daily_summary(bot, chat_id):
+async def daily_summary(bot, group_chat_id):
     current_date = datetime.date.today()
     tomorrow_date = current_date + datetime.timedelta(days=1)
     user_ids = get_all_user_ids()
+
+    group_message = f'Привет!\nЕжедневная сводка задач на сегодня, {current_date}:\n'
+    tasks_today_group = []
+    tasks_tomorrow_group = []
 
     for user_id in user_ids:
         reminders = list_reminders(user_id)
@@ -112,16 +116,34 @@ async def daily_summary(bot, chat_id):
             if datetime.datetime.strptime(reminder[1], '%Y-%m-%d %H:%M:%S').date() == tomorrow_date
         ]
 
-        message = f'привет!\nежедневная сводка задач на сегодня, {current_date}:\n'
+        user_message = f'привет!\nежедневная сводка задач на сегодня, {current_date}:\n'
         if tasks_today:
-            message += '\n'.join(tasks_today)
+            user_message += '\n'.join(tasks_today)
         else:
-            message += 'на сегодня задач нет\n'
-        message += f'\n\nзапланировано на завтра, {tomorrow_date}:\n'
+            user_message += 'на сегодня задач нет\n'
+        user_message += f'\n\nзапланировано на завтра, {tomorrow_date}:\n'
         if tasks_tomorrow:
-            message += '\n'.join(tasks_tomorrow)
+            user_message += '\n'.join(tasks_tomorrow)
         else:
-            message += 'на завтра задач нет'
+            user_message += 'на завтра задач нет'
         logger.info(f'sending daily summary to user {user_id}')
-        await bot.send_message(chat_id=user_id, text=message)
+        await bot.send_message(chat_id=user_id, text=user_message)
+
+        tasks_today_group.extend(tasks_today)
+        tasks_tomorrow_group.extend(tasks_tomorrow)
+
+    # Формируем и отправляем групповое сообщение
+    if tasks_today_group:
+        group_message += '\n'.join(tasks_today_group)
+    else:
+        group_message += 'на сегодня задач нет\n'
+    group_message += f'\n\nзапланировано на завтра, {tomorrow_date}:\n'
+    if tasks_tomorrow_group:
+        group_message += '\n'.join(tasks_tomorrow_group)
+    else:
+        group_message += 'на завтра задач нет'
+
+    logger.info(f'sending daily summary to group {group_chat_id}')
+    await bot.send_message(chat_id=group_chat_id, text=group_message)
+
     logger.info('daily summary job completed')

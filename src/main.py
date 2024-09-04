@@ -69,8 +69,8 @@ if __name__ == '__main__':
 
     scheduler = AsyncIOScheduler()
 
-    scheduler.add_job(daily_summary, 'cron', hour=9,
-                      minute=54, args=[bot, CHAT_ID])
+    scheduler.add_job(daily_summary, 'cron', hour=8,
+                      minute=55, args=[bot, CHAT_ID])
     application.job_queue.run_once(schedule_user_weather_jobs, 0)
 
     scheduler.start()
