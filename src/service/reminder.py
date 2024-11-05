@@ -41,6 +41,19 @@ def add_reminder(user_id, time_str, message):
         f'reminder added for user {user_id} at {reminder_time} with message: {message}')
 
 
+def format_time(reminder_time):
+    try:
+        time_obj = datetime.datetime.strptime(
+            reminder_time, '%Y-%m-%d %H:%M:%S')
+    except ValueError:
+        time_obj = datetime.datetime.strptime(reminder_time, '%Y-%m-%d %H:%M')
+
+    if time_obj.time() == datetime.time(0, 0):
+        return time_obj.strftime('%Y-%m-%d')
+    else:
+        return time_obj.strftime('%Y-%m-%d %H:%M')
+
+
 def list_reminders(user_id):
     conn = get_reminder_db_connection()
     c = conn.cursor()
@@ -48,8 +61,15 @@ def list_reminders(user_id):
         'SELECT * FROM reminders WHERE user_id=? ORDER BY reminder_time', (user_id,))
     reminders = c.fetchall()
     conn.close()
-    logger.info(f'retrieved reminders for user {user_id}: {reminders}')
-    return reminders
+
+    formatted_reminders = [
+        (reminder[0], format_time(reminder[1]), reminder[2])
+        for reminder in reminders
+    ]
+
+    logger.info(
+        f'retrieved reminders for user {user_id}: {formatted_reminders}')
+    return formatted_reminders
 
 
 def delete_reminder_by_index(user_id, indices):
@@ -93,12 +113,22 @@ def parse_indices(indices_str):
     return indices
 
 
+def parse_reminder_time(reminder_time):
+    try:
+        return datetime.datetime.strptime(reminder_time, '%Y-%m-%d %H:%M:%S')
+    except ValueError:
+        try:
+            return datetime.datetime.strptime(reminder_time, '%Y-%m-%d %H:%M')
+        except ValueError:
+            return datetime.datetime.strptime(reminder_time, '%Y-%m-%d').replace(hour=0, minute=0)
+
+
 async def daily_summary(bot, group_chat_id):
     current_date = datetime.date.today()
     tomorrow_date = current_date + datetime.timedelta(days=1)
     user_ids = get_all_user_ids()
 
-    group_message = f'Привет!\nЕжедневная сводка задач на сегодня, {current_date}:\n'
+    group_message = f'привет!\neжедневная сводка задач на сегодня, {current_date}:\n'
     tasks_today_group = []
     tasks_tomorrow_group = []
 
@@ -106,14 +136,14 @@ async def daily_summary(bot, group_chat_id):
         reminders = list_reminders(user_id)
 
         tasks_today = [
-            f'{i + 1}. {datetime.datetime.strptime(reminder[1], "%Y-%m-%d %H:%M:%S").strftime("%H:%M")} {reminder[2]}'
+            f'{i + 1}. {parse_reminder_time(reminder[1]).strftime("%H:%M")} {reminder[2]}'
             for i, reminder in enumerate(reminders)
-            if datetime.datetime.strptime(reminder[1], '%Y-%m-%d %H:%M:%S').date() == current_date
+            if parse_reminder_time(reminder[1]).date() == current_date
         ]
         tasks_tomorrow = [
-            f'{i + 1}. {datetime.datetime.strptime(reminder[1], "%Y-%m-%d %H:%M:%S").strftime("%H:%M")} {reminder[2]}'
+            f'{i + 1}. {parse_reminder_time(reminder[1]).strftime("%H:%M")} {reminder[2]}'
             for i, reminder in enumerate(reminders)
-            if datetime.datetime.strptime(reminder[1], '%Y-%m-%d %H:%M:%S').date() == tomorrow_date
+            if parse_reminder_time(reminder[1]).date() == tomorrow_date
         ]
 
         user_message = f'привет!\nежедневная сводка задач на сегодня, {current_date}:\n'
@@ -132,7 +162,7 @@ async def daily_summary(bot, group_chat_id):
         tasks_today_group.extend(tasks_today)
         tasks_tomorrow_group.extend(tasks_tomorrow)
 
-    # Формируем и отправляем групповое сообщение
+    # формируем и отправляем групповое сообщение
     if tasks_today_group:
         group_message += '\n'.join(tasks_today_group)
     else:

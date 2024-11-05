@@ -27,4 +27,4 @@ async def send_service_message(message):
         try:
             await bot.send_message(chat_id=user_id, text=message)
         except Exception as e:
-            logger.error(f'Failed to send message to user {user_id}: {e}')
+            logger.error(f'failed to send message to user {user_id}: {e}')
