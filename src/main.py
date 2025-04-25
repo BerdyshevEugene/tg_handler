@@ -1,22 +1,26 @@
 import os
+import sys
+import signal
 
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from telegram import Bot
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, filters,
     CallbackQueryHandler, ConversationHandler
 )
+from telegram.warnings import PTBUserWarning
 
-from logger.logger import setup_logger
-from service.reminder import daily_summary
-from handlers.base_handler import cancel
+from handlers.month_handler import month_reminders
 from handlers.handler import (
     start, handle_service_message, location, button,
     handle_add_reminder_finish, handle_delete_reminder_finish, ADD_REMINDER,
     DELETE_REMINDER
 )
+from handlers.base_handler import cancel
+from logger.logger import setup_logger
+from service.reminder import daily_summary
 
 
 load_dotenv()
@@ -27,28 +31,44 @@ ADD_REMINDER, DELETE_REMINDER = range(2)
 bot = Bot(token=TG_BOT_TOKEN)
 
 
+def stop_handler(signal, frame):
+    logger.info('bot stopped')
+    scheduler.shutdown()
+    application.stop()
+    sys.exit(0)
+
+
 if __name__ == '__main__':
-    setup_logger()
-    application = Application.builder().token(TG_BOT_TOKEN).build()
+    try:
+        logger = setup_logger()
+        application = Application.builder().token(TG_BOT_TOKEN).build()
+        logger.info('START registering command handlers')
 
-    conv_handler = ConversationHandler(
-        entry_points=[CallbackQueryHandler(button)],
-        states={
-            ADD_REMINDER: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_add_reminder_finish)],
-            DELETE_REMINDER: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_delete_reminder_finish)],
-        },
-        fallbacks=[CommandHandler('cancel', cancel)],
-    )
+        conv_handler = ConversationHandler(
+            entry_points=[CallbackQueryHandler(button)],
+            states={
+                ADD_REMINDER: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_add_reminder_finish)],
+                DELETE_REMINDER: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_delete_reminder_finish)],
+            },
+            fallbacks=[CommandHandler('cancel', cancel)],
+            per_message=True,
+        )
 
-    application.add_handler(CommandHandler('start', start))
-    application.add_handler(CommandHandler('service', handle_service_message))
-    application.add_handler(MessageHandler(filters.LOCATION, location))
-    application.add_handler(conv_handler)
+        application.add_handler(CommandHandler('start', start))
+        application.add_handler(CommandHandler(
+            'service', handle_service_message))
+        application.add_handler(CommandHandler('month', month_reminders))
+        application.add_handler(MessageHandler(filters.LOCATION, location))
+        application.add_handler(conv_handler)
 
-    # планировщик задач
-    scheduler = AsyncIOScheduler()
-    scheduler.add_job(daily_summary, 'cron', hour=8,
-                      minute=30, args=[bot, CHAT_ID])
-
-    scheduler.start()
-    application.run_polling()  # запуск бота
+        # планировщик задач
+        scheduler = AsyncIOScheduler()
+        scheduler.add_job(daily_summary, 'cron', hour=8,
+                          minute=30, args=[bot, CHAT_ID])
+        logger.info('the scheduler is set to run daily at 8:30 a.m.')
+        scheduler.start()
+        signal.signal(signal.SIGINT, stop_handler)
+        signal.signal(signal.SIGTERM, stop_handler)
+        application.run_polling()
+    except Exception as e:
+        logger.critical(f'bot crashed with error: {e}')

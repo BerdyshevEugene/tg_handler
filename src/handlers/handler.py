@@ -1,13 +1,14 @@
+from datetime import datetime
 from telegram import Bot, Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, ConversationHandler
-from datetime import datetime
 
-from location_storage import add_location
+from handlers.month_handler import month_reminders
+from service.location_storage import add_location
 from service.reminder import (
     add_reminder, list_reminders, delete_reminder_by_index, parse_indices)
 from service.service_messages import send_service_message
 from service.db_connector import get_tasks_for_month
-from calendar_handler.calendar_generator import generate_calendar_image
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -15,13 +16,13 @@ logger = logging.getLogger(__name__)
 ADD_REMINDER, DELETE_REMINDER = range(2)
 
 
-def get_main_keyboard():
+def get_main_keyboard(now: datetime):
     '''
     создает и возвращает главное меню в виде клавиатуры с кнопками для
     взаимодействия с пользователем
     '''
-    current_year = datetime.now().year
-    current_month = datetime.now().month
+    current_year = now.year
+    current_month = now.month
     keyboard = [
         [InlineKeyboardButton('добавить напоминание',
                               callback_data='addreminder')],
@@ -38,9 +39,10 @@ def get_main_keyboard():
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    now = datetime.now()
     await update.message.reply_text(
         'выберите действие:',
-        reply_markup=get_main_keyboard()
+        reply_markup=get_main_keyboard(now)
     )
 
 
@@ -168,34 +170,6 @@ async def handle_delete_reminder_finish(update: Update, context: ContextTypes.DE
     return ConversationHandler.END
 
 
-async def handle_show_calendar(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    # Разбор данных из callback_data
-    data = query.data.split('_')
-    if len(data) != 3:
-        await query.message.reply_text('неверный формат данных для календаря.')
-        return
-
-    command, month, year = data[0], int(data[1]), int(data[2])
-    if command != 'showcalendar':
-        return
-
-    user_id = query.from_user.id
-    tasks = get_tasks_for_month(user_id, year, month)
-
-    try:
-        calendar_image_path = generate_calendar_image(year, month, tasks)
-
-        with open(calendar_image_path, 'rb') as photo:
-            await query.message.reply_photo(photo)
-
-    except Exception as e:
-        logger.error(f'error generating the calendar: {e}')
-        await query.message.reply_text('не удалось сгенерировать календарь')
-
-
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -210,6 +184,6 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif command == 'sendlocation':
         await sendlocation(update, context)
     elif command.startswith('showcalendar_'):
-        await handle_show_calendar(update, context)
+        await month_reminders(update, context)
 
     return ConversationHandler.END
