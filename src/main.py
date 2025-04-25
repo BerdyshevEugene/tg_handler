@@ -14,19 +14,18 @@ from telegram.warnings import PTBUserWarning
 
 from handlers.month_handler import month_reminders
 from handlers.handler import (
-    start, handle_service_message, location, button,
-    handle_add_reminder_finish, handle_delete_reminder_finish, ADD_REMINDER,
-    DELETE_REMINDER
-)
+    start, location, button,
+    handle_add_reminder_finish, handle_delete_reminder_finish)
+from handlers.service_message_handler import handle_service_message
 from handlers.base_handler import cancel
 from logger.logger import setup_logger
 from service.reminder import daily_summary
+from service.states import ADD_REMINDER, DELETE_REMINDER
 
 
 load_dotenv()
 TG_BOT_TOKEN = os.getenv('TG_BOT_TOKEN')
 CHAT_ID = os.getenv('GROUP_ID')
-ADD_REMINDER, DELETE_REMINDER = range(2)
 
 bot = Bot(token=TG_BOT_TOKEN)
 
@@ -51,7 +50,7 @@ if __name__ == '__main__':
                 DELETE_REMINDER: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_delete_reminder_finish)],
             },
             fallbacks=[CommandHandler('cancel', cancel)],
-            per_message=True,
+            per_chat=True,
         )
 
         application.add_handler(CommandHandler('start', start))

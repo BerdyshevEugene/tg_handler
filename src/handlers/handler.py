@@ -2,18 +2,13 @@ from datetime import datetime
 from telegram import Bot, Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, ConversationHandler
 
+from loguru import logger
 from handlers.month_handler import month_reminders
 from service.location_storage import add_location
 from service.reminder import (
     add_reminder, list_reminders, delete_reminder_by_index, parse_indices)
-from service.service_messages import send_service_message
 from service.db_connector import get_tasks_for_month
-
-import logging
-
-logger = logging.getLogger(__name__)
-
-ADD_REMINDER, DELETE_REMINDER = range(2)
+from service.states import ADD_REMINDER, DELETE_REMINDER
 
 
 def get_main_keyboard(now: datetime):
@@ -39,21 +34,12 @@ def get_main_keyboard(now: datetime):
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    '''запускает основное меню бота с листом команд'''
     now = datetime.now()
     await update.message.reply_text(
         'выберите действие:',
         reply_markup=get_main_keyboard(now)
     )
-
-
-async def handle_service_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    '''
-    здесь реализована рассылка служебных сообщений пользователю. Добавляять в
-    переменную "message"
-    '''
-    message = 'обновления: \n- тут должны быть обновления, но их нет'
-    await send_service_message(message)
-    await update.message.reply_text('служебные сообщения отправлены всем пользователям')
 
 
 async def sendlocation(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -77,6 +63,7 @@ async def handle_add_reminder_start(update: Update, context: ContextTypes.DEFAUL
 
 
 async def handle_add_reminder_finish(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.debug(f'handle_add_reminder_finish called with update: {update}')
     if update.callback_query:
         user_id = update.callback_query.from_user.id
     else:
@@ -139,22 +126,30 @@ async def handle_list_reminders(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 async def handle_delete_reminder_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    '''
-    запускает удаление напоминания. Нужно ввести номер
-    '''
-    await update.callback_query.message.reply_text('введите номер напоминания для удаления')
+    '''запускает удаление напоминания. Нужно ввести номер'''
+    logger.debug('handle_delete_reminder_start called')
+    await update.callback_query.message.reply_text(
+        'введите номер(а) напоминаний, которые хотите удалить'
+    )
     return DELETE_REMINDER
 
 
 async def handle_delete_reminder_finish(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.debug(f'handle_delete_reminder_finish called with update: {update}')
+
     try:
         user_id = getattr(update.callback_query, 'from_user',
                           update.message.from_user).id
         text = update.effective_message.text.strip()
+        logger.debug(f'user_id: {user_id}, text: {text}')
+
         indices = parse_indices(text)
+        logger.debug(f'parsed indices: {indices}')
 
         if indices:
             successful, failed = delete_reminder_by_index(user_id, indices)
+            logger.info(
+                f'reminders deleted: success={successful}, failed={failed}')
             message = (f'удалены напоминания под номерами: {", ".join(str(idx + 1) for idx in successful)}'
                        if successful else 'напоминания с указанными номерами не найдены')
             await update.message.reply_text(message)
@@ -162,6 +157,7 @@ async def handle_delete_reminder_finish(update: Update, context: ContextTypes.DE
             await update.message.reply_text('введите номер(а) напоминания для удаления')
 
     except ValueError:
+        logger.warning('invalid input format')
         await update.message.reply_text('неправильный формат. Введите номер(а) напоминания для удаления')
     except Exception as e:
         logger.error(f'произошла ошибка: {e}')
@@ -174,6 +170,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     command = query.data
+    logger.debug(f'button pressed: {command}')
 
     if command == 'addreminder':
         return await handle_add_reminder_start(update, context)
