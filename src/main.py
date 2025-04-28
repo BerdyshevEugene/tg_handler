@@ -69,7 +69,7 @@ class TelegramBot:
         self.application.add_handler(conv_handler)
 
     def schedule_jobs(self):
-        '''настройка планировщика задач (например, ежедневные отчеты)'''
+        '''настройка планировщика задач'''
         self.scheduler.add_job(daily_summary, 'cron',
                                hour=8, minute=30, args=[self.bot, CHAT_ID])
         self.logger.info('the scheduler is set to run daily at 8:30 a.m.')
