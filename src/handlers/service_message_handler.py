@@ -10,7 +10,7 @@ async def handle_service_message(update: Update, context: ContextTypes.DEFAULT_T
     здесь реализована рассылка служебных сообщений пользователю. Добавляйте в
     переменную "message"
     '''
-    message = 'обновления: \n- тут должны быть обновления, но их нет'
+    message = 'обновления: \n1.0.1: добавлена функция отображения текущего месяца/задач (тестовый режим). Можно выбрать в основном меню.'
 
     try:
         await send_service_message(message)
