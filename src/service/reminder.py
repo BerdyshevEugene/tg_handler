@@ -1,3 +1,4 @@
+import calendar
 import datetime
 import dateparser
 from loguru import logger
@@ -70,6 +71,34 @@ def list_reminders(user_id):
     logger.info(
         f'retrieved reminders for user {user_id}: {formatted_reminders}')
     return formatted_reminders
+
+
+def list_month_reminders(user_id, year, month):
+    conn = get_reminder_db_connection()
+    c = conn.cursor()
+
+    start_date = f'{year}-{month:02d}-01'
+    if month == 12:
+        end_date = f'{year + 1}-01-01'
+    else:
+        end_date = f'{year}-{month + 1:02d}-01'
+
+    c.execute(
+        'SELECT reminder_time, message FROM reminders WHERE user_id = ? AND reminder_time >= ? AND reminder_time < ? ORDER BY reminder_time',
+        (user_id, start_date, end_date)
+    )
+    reminders = c.fetchall()
+    conn.close()
+
+    reminders_by_day = {}
+    for reminder_time, text in reminders:
+        day = int(reminder_time.split('-')[2].split()[0])
+
+        if day not in reminders_by_day:
+            reminders_by_day[day] = ''
+        reminders_by_day[day] += f'{text}\n                '
+
+    return reminders_by_day
 
 
 def delete_reminder_by_index(user_id, indices):

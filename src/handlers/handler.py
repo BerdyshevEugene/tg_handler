@@ -1,5 +1,4 @@
-from datetime import datetime
-from telegram import Bot, Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler
 
 from loguru import logger
@@ -11,39 +10,9 @@ from service.db_connector import get_tasks_for_month
 from service.states import ADD_REMINDER, DELETE_REMINDER
 
 
-def get_main_keyboard(now: datetime):
-    '''
-    создает и возвращает главное меню в виде клавиатуры с кнопками для
-    взаимодействия с пользователем
-    '''
-    current_year = now.year
-    current_month = now.month
-    keyboard = [
-        [InlineKeyboardButton('добавить напоминание',
-                              callback_data='addreminder')],
-        [InlineKeyboardButton('список напоминаний',
-                              callback_data='listreminders')],
-        [InlineKeyboardButton('удалить напоминание(-я)',
-                              callback_data='deletereminder')],
-        [InlineKeyboardButton('отправить местоположение',
-                              callback_data='sendlocation')],
-        [InlineKeyboardButton(
-            'показать календарь (тестовый функционал)', callback_data=f'showcalendar_{current_month}_{current_year}')]
-    ]
-    return InlineKeyboardMarkup(keyboard)
-
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    '''запускает основное меню бота с листом команд'''
-    now = datetime.now()
-    await update.message.reply_text(
-        'выберите действие:',
-        reply_markup=get_main_keyboard(now)
-    )
-
-
 async def sendlocation(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.callback_query.message.reply_text('пожалуйста, отправьте мне вашу геопозицию, чтобы я мог отправлять вам задачи по расписанию')
+    await update.callback_query.message.reply_text(
+        'пожалуйста, отправьте мневашу геопозицию, чтобы я мог отправлять вам задачи по расписанию')
 
 
 async def location(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -162,25 +131,5 @@ async def handle_delete_reminder_finish(update: Update, context: ContextTypes.DE
     except Exception as e:
         logger.error(f'произошла ошибка: {e}')
         await update.message.reply_text('произошла ошибка. Попробуйте еще раз или обратитесь к администратору')
-
-    return ConversationHandler.END
-
-
-async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    command = query.data
-    logger.debug(f'button pressed: {command}')
-
-    if command == 'addreminder':
-        return await handle_add_reminder_start(update, context)
-    elif command == 'listreminders':
-        await handle_list_reminders(update, context)
-    elif command == 'deletereminder':
-        return await handle_delete_reminder_start(update, context)
-    elif command == 'sendlocation':
-        await sendlocation(update, context)
-    elif command.startswith('showcalendar_'):
-        await month_reminders(update, context)
 
     return ConversationHandler.END

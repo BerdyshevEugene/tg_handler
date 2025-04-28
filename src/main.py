@@ -13,11 +13,11 @@ from telegram.ext import (
 from telegram.warnings import PTBUserWarning
 
 from handlers.month_handler import month_reminders
-from handlers.handler import (
-    start, location, button,
-    handle_add_reminder_finish, handle_delete_reminder_finish)
+from handlers.base_handler import cancel, start, button
+from handlers.handler import (location, handle_add_reminder_finish,
+                              handle_delete_reminder_finish)
 from handlers.service_message_handler import handle_service_message
-from handlers.base_handler import cancel
+
 from logger.logger import setup_logger
 from service.reminder import daily_summary
 from service.states import ADD_REMINDER, DELETE_REMINDER

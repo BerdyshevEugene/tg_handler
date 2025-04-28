@@ -6,6 +6,8 @@ import datetime
 from telegram import Update
 from telegram.ext import ContextTypes
 
+from service.reminder import list_month_reminders
+
 
 def generate_calendar_image(month_name: str, year: int, month: int, reminders: dict) -> io.BytesIO:
     '''генерирует изображение календаря с напоминаниями'''
@@ -131,11 +133,7 @@ async def month_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     now = datetime.datetime.now()
     month_name = now.strftime('%B %Y')
-    reminders = {
-        25: 'сходить к врачу',
-        28: 'оплатить счёт'
-    }
-
+    reminders = list_month_reminders(user_id, now.year, now.month)
     image_bytes = generate_calendar_image(
         month_name=month_name,
         year=now.year,
