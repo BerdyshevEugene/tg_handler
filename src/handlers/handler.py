@@ -1,4 +1,8 @@
+import calendar
+
+from datetime import datetime
 from telegram import Update
+from telegram.constants import ParseMode
 from telegram.ext import ContextTypes, ConversationHandler
 
 from loguru import logger
@@ -68,30 +72,39 @@ async def handle_list_reminders(update: Update, context: ContextTypes.DEFAULT_TY
     reminders = list_reminders(user_id)
 
     reminder_texts = []
-    current_date = None
+    current_month = None
+
+    month_names_ru = {
+        1: 'Январь', 2: 'Февраль', 3: 'Март', 4: 'Апрель',
+        5: 'Май', 6: 'Июнь', 7: 'Июль', 8: 'Август',
+        9: 'Сентябрь', 10: 'Октябрь', 11: 'Ноябрь', 12: 'Декабрь'
+    }
 
     for i, reminder in enumerate(reminders):
         reminder_datetime = reminder[1]
         reminder_parts = reminder_datetime.split()
 
-        if len(reminder_parts) > 1:
-            reminder_time = reminder_parts[1][:5]
-        else:
-            reminder_time = ""
-
-        reminder_message = f'{reminder_parts[0]} {reminder_time}: {reminder[2]}' if reminder_time else f'{reminder_parts[0]}: {reminder[2]}'
-
         reminder_date = reminder_parts[0]
-        if reminder_date != current_date:
-            if i != 0:
-                reminder_texts.append('')
-            current_date = reminder_date
+        formatted_date = f'{reminder_date.split("-")[2]}/{reminder_date.split("-")[1]}'
 
+        month_year = reminder_date[:7]
+        year, month = reminder_date.split('-')[:2]
+        month = int(month)
+
+        month_name = month_names_ru[month]
+
+        if month_year != current_month:
+            if current_month:
+                reminder_texts.append('')
+            reminder_texts.append(f'<b>{month_name} {year}:</b>')
+            current_month = month_year
+
+        reminder_message = f'<b>{formatted_date}:</b> {reminder[2]}'
         reminder_texts.append(f'{i + 1}. {reminder_message}')
 
     response_text = '\n'.join(
         reminder_texts) if reminder_texts else 'напоминаний нет'
-    await query.message.edit_text(response_text)
+    await query.message.edit_text(response_text, parse_mode=ParseMode.HTML)
 
 
 async def handle_delete_reminder_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
