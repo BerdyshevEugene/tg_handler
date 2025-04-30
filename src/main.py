@@ -1,33 +1,23 @@
+# main.py
 import os
 import sys
 import signal
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from dotenv import load_dotenv
 from telegram import Bot
-from telegram.ext import (
-    Application, CommandHandler, MessageHandler, filters,
-    CallbackQueryHandler, ConversationHandler
-)
-from handlers.month_handler import month_reminders
-from handlers.base_handler import cancel, start, button
-from handlers.handler import (
-    location, handle_add_reminder_finish, handle_delete_reminder_finish)
-from handlers.service_message_handler import handle_service_message
+from telegram.ext import Application
 from logger.logger import setup_logger
 from service.reminder import daily_summary
-from service.states import ADD_REMINDER, DELETE_REMINDER
+from handlers.handler_main import HandlerMain
 
 
 load_dotenv()
 TG_BOT_TOKEN = os.getenv('TG_BOT_TOKEN')
-CHAT_ID = os.getenv('GROUP_ID')
+GROUP_ID = os.getenv('GROUP_ID')
 
 
 class TelegramBot:
-    '''
-    основной класс телеграм бота
-    '''
-
+    '''основной класс телеграм бота'''
     def __init__(self):
         '''инициализация бота'''
         self.token = TG_BOT_TOKEN
@@ -35,47 +25,24 @@ class TelegramBot:
         self.scheduler = AsyncIOScheduler()
         self.application = Application.builder().token(self.token).build()
         self.logger = setup_logger()
+        self.handler_main = HandlerMain(self)
 
     def stop_handler(self, signal, frame):
-        '''обработчик остановки бота при получении сигнала'''
+        '''обработчик остановки бота'''
         self.logger.info('bot stopped')
         self.scheduler.shutdown()
         self.application.stop()
         sys.exit(0)
 
-    def add_handlers(self):
-        '''
-        добавление всех обработчиков команд и событий
-        '''
-        self.application.add_handler(CommandHandler('start', start))
-        self.application.add_handler(
-            CommandHandler('service', handle_service_message))
-        self.application.add_handler(CommandHandler('month', month_reminders))
-        self.application.add_handler(
-            MessageHandler(filters.LOCATION, location))
-
-        # обработчики для добавления и удаления напоминаний
-        conv_handler = ConversationHandler(
-            entry_points=[CallbackQueryHandler(button)],
-            states={
-                ADD_REMINDER: [MessageHandler(
-                    filters.TEXT & ~filters.COMMAND, handle_add_reminder_finish)],
-                DELETE_REMINDER: [MessageHandler(
-                    filters.TEXT & ~filters.COMMAND, handle_delete_reminder_finish)],
-            },
-            fallbacks=[CommandHandler('cancel', cancel)],
-            per_chat=True,
-        )
-        self.application.add_handler(conv_handler)
-
     def schedule_jobs(self):
         '''настройка планировщика задач'''
         self.scheduler.add_job(daily_summary, 'cron',
-                               hour=8, minute=30, args=[self.bot, CHAT_ID])
+                             hour=8, minute=30, args=[self.bot, GROUP_ID])
         self.logger.info('the scheduler is set to run daily at 8:30 a.m.')
 
     def run(self):
-        self.add_handlers()
+        '''запуск бота'''
+        self.handler_main.handle()
         self.schedule_jobs()
 
         self.scheduler.start()
