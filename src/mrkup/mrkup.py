@@ -8,7 +8,7 @@ from .keyboard_constants import KEYBOARD
 
 class Keyboard:
     '''
-    класс для создания reply-клавиатур (кнопки внизу экрана)
+    класс для создания reply-клавиатур
     '''
     def __init__(self):
         self.markup = None
@@ -25,13 +25,12 @@ class Keyboard:
         itm_btn_3 = self.set_btn('удалить напоминание')
         itm_btn_4 = self.set_btn('показать календарь')
         itm_btn_5 = self.set_btn('инфо')
-        
-        # создаем разметку с кнопками
+
         self.markup = ReplyKeyboardMarkup(
-            keyboard=[  # добавляем список кнопок
-                [itm_btn_1], 
-                [itm_btn_2, itm_btn_3], 
-                [itm_btn_4], 
+            keyboard=[
+                [itm_btn_1],
+                [itm_btn_2, itm_btn_3],
+                [itm_btn_4],
                 [itm_btn_5]
             ],
             resize_keyboard=True, 
@@ -42,12 +41,50 @@ class Keyboard:
 
     def info_menu(self):
         itm_btn = self.set_btn('<<')
-        
-        # создаем разметку с кнопкой
+
         self.markup = ReplyKeyboardMarkup(
             keyboard=[[itm_btn]],  # список кнопок
             resize_keyboard=True,
             input_field_placeholder='выберите действие'
+        )
+        return self.markup
+
+    def reminder_type_menu(self):
+        '''
+        создает меню выбора типа напоминания (одноразовое/регулярное)
+        '''
+        itm_btn_1 = self.set_btn('одноразовое')
+        itm_btn_2 = self.set_btn('регулярное')
+        itm_btn_back = self.set_btn('<<')
+
+        self.markup = ReplyKeyboardMarkup(
+            keyboard=[
+                [itm_btn_1, itm_btn_2],
+                [itm_btn_back]
+            ],
+            resize_keyboard=True,
+            input_field_placeholder='выберите тип напоминания'
+        )
+        return self.markup
+
+    def frequency_menu(self):
+        '''
+        создает меню выбора периодичности для регулярных напоминаний
+        '''
+        itm_btn_1 = self.set_btn('ежедневно')
+        itm_btn_2 = self.set_btn('еженедельно')
+        itm_btn_3 = self.set_btn('ежемесячно')
+        itm_btn_4 = self.set_btn('ежегодно')
+        itm_btn_back = self.set_btn('<<')
+        
+        self.markup = ReplyKeyboardMarkup(
+            keyboard=[
+                [itm_btn_1, itm_btn_2],
+                [itm_btn_3, itm_btn_4],
+                [itm_btn_back]
+            ],
+            resize_keyboard=True,
+            input_field_placeholder='выберите периодичность напоминаний'
         )
         return self.markup
 

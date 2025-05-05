@@ -9,7 +9,7 @@ from loguru import logger
 from service.location_storage import add_location
 from service.reminder import (
     add_reminder, list_reminders, delete_reminder_by_index, parse_indices)
-from service.states import ADD_REMINDER, DELETE_REMINDER
+from service.states import ADD_REMINDER, DELETE_REMINDER, CHOOSE_REMINDER_TYPE
 
 
 async def sendlocation(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -27,15 +27,11 @@ async def location(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_add_reminder_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.callback_query:
-        await update.callback_query.message.reply_text(
-            'введите напоминание в одном из следующих форматов: \n- YYYY-MM-DD HH:MM ваше сообщение \n- 18 августа посмотреть фильм \n- послезавтра в 18:00 не забыть позвонить кому нибудь \n\n чтобы отменить ввод, введите "отмена" или "cancel"'
-        )
-    else:
-        await update.message.reply_text(
-            'введите напоминание в одном из следующих форматов: \n- YYYY-MM-DD HH:MM ваше сообщение \n- 18 августа посмотреть фильм \n- послезавтра в 18:00 не забыть позвонить кому нибудь \n\n чтобы отменить ввод, введите "отмена" или "cancel"'
-        )
-    return ADD_REMINDER
+    await update.message.reply_text(
+        'выберите тип напоминания:',
+        reply_markup=context.bot_data['keyboards'].reminder_type_menu()
+    )
+    return CHOOSE_REMINDER_TYPE
 
 
 async def handle_add_reminder_finish(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -62,7 +58,10 @@ async def handle_add_reminder_finish(update: Update, context: ContextTypes.DEFAU
 
     try:
         add_reminder(user_id, time_str, message)
-        await update.message.reply_text('напоминание добавлено')
+        await update.message.reply_text(
+            'напоминание добавлено',
+            reply_markup=context.bot_data['keyboards'].start_menu()
+        )
         return ConversationHandler.END
     except ValueError as e:
         await update.message.reply_text(str(e))
@@ -150,11 +149,11 @@ async def handle_delete_reminder_finish(update: Update, context: ContextTypes.DE
                        if successful else 'напоминания с указанными номерами не найдены')
             await update.message.reply_text(message)
         else:
-            await update.message.reply_text('введите номер(а) напоминания для удаления')
+            await update.message.reply_text('введите номер(-а) напоминания для удаления')
 
     except ValueError:
         logger.warning('invalid input format')
-        await update.message.reply_text('неправильный формат. Введите номер(а) напоминания для удаления')
+        await update.message.reply_text('неправильный формат. Введите номер(-а) напоминания для удаления')
     except Exception as e:
         logger.error(f'error when deleting: {e}')
         await update.message.reply_text('произошла ошибка. Попробуйте еще раз или обратитесь к администратору')

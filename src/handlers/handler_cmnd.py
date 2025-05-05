@@ -5,16 +5,21 @@ from telegram.ext import (
 from telegram import Update
 from telegram.ext import ContextTypes
 from loguru import logger
-from service.states import ADD_REMINDER, DELETE_REMINDER
 from handlers.handler_logic import (
     handle_add_reminder_start, handle_list_reminders,
     handle_delete_reminder_start, handle_add_reminder_finish,
     handle_delete_reminder_finish, location
 )
+from handlers.handler_reminder import (
+    handle_choose_reminder_type, handle_choose_frequency)
 from handlers.handler import Handler
 from handlers.month_handler import month_reminders
 from handlers.service_message_handler import handle_service_message
 from mrkup.keyboard_constants import KEYBOARD
+from service.states import (
+    ADD_REMINDER, DELETE_REMINDER,
+    CHOOSE_REMINDER_TYPE, CHOOSE_REMINDER_FREQUENCY
+)
 
 
 class HandlerCommands(Handler):
@@ -22,6 +27,7 @@ class HandlerCommands(Handler):
     def __init__(self, bot):
         super().__init__(bot)
         self.application = bot.application
+        self.application.bot_data['keyboards'] = self.keyboards
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         '''обработка команды /start с reply-клавиатурой'''
@@ -73,11 +79,13 @@ class HandlerCommands(Handler):
                 MessageHandler(filters.Regex(KEYBOARD['добавить напоминание']), handle_add_reminder_start),
                 MessageHandler(filters.Regex(KEYBOARD['удалить напоминание']), handle_delete_reminder_start)
             ],
-            states={
-                ADD_REMINDER: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_add_reminder_finish)],
-                DELETE_REMINDER: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_delete_reminder_finish)],
-            },
-            fallbacks=[CommandHandler('cancel', self.cancel)],
+        states={
+            CHOOSE_REMINDER_TYPE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_choose_reminder_type)],
+            CHOOSE_REMINDER_FREQUENCY: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_choose_frequency)],
+            ADD_REMINDER: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_add_reminder_finish)],
+            DELETE_REMINDER: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_delete_reminder_finish)],
+        },
+        fallbacks=[CommandHandler('cancel', self.cancel)],
         )
         self.application.add_handler(conv_handler)
 
